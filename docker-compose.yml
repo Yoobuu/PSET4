@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: pset4-postgres
+    environment:
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pyspark-notebook:
+    image: quay.io/jupyter/pyspark-notebook:spark-3.5.3
+    container_name: pset4-spark
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1::8888"
+      - "127.0.0.1::4040"
+    environment:
+      PYSPARK_SUBMIT_ARGS: "--packages org.postgresql:postgresql:42.7.4 pyspark-shell"
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_DB: ${PG_DB}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_SCHEMA_RAW: ${PG_SCHEMA_RAW}
+      PG_SCHEMA_ANALYTICS: ${PG_SCHEMA_ANALYTICS}
+      DATA_ROOT: ${DATA_ROOT}
+    volumes:
+      - ./notebooks:/home/jovyan/work/notebooks
+      - ./data:/home/jovyan/work/data
+      - ./scripts:/home/jovyan/work/scripts
+      - ./obt_builder:/home/jovyan/work/obt_builder
+
+volumes:
+  pgdata:

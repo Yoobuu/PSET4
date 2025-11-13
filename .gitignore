@@ -1,0 +1,10 @@
+# datos y artefactos
+data/
+evidence/
+work/
+
+# secretos locales
+.env
+
+# cache notebooks
+.ipynb_checkpoints/
