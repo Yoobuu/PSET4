@@ -1,32 +1,66 @@
 services:
   postgres:
-    image: postgres:16.4
-    container_name: pset4-postgres
+    image: postgres:16
+    container_name: pset4_postgres
+    ports:
+      - "${PG_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${PG_DB}
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASSWORD}
-    ports:
-      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pset4_pgdata:/var/lib/postgresql/data
+      - ./scripts/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
+    restart: unless-stopped
 
-  pyspark-notebook:
-    image: quay.io/jupyter/pyspark-notebook:spark-3.5.3
-    container_name: pset4-spark
+  spark-notebook:
+    image: jupyter/pyspark-notebook:python-3.11
+    container_name: pset4_spark
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1::8888"
-      - "127.0.0.1::4040"
+      - "${JUPYTER_PORT:-8888}:8888"   # Jupyter
+      - "${SPARK_UI_PORT:-4040}:4040"  # Spark UI
     environment:
-      PYSPARK_SUBMIT_ARGS: "--packages org.postgresql:postgresql:42.7.4 pyspark-shell"
+      SPARK_LOCAL_IP: 0.0.0.0
+      PYSPARK_PYTHON: python
+
+      # ❗ NO asignamos memoria aquí.
+      # Lo haremos desde SparkSession en Python.
+      #
+      # Evita que la JVM muera al arrancar (tu error Py4J).
+
+      PYSPARK_SUBMIT_ARGS: >
+        --driver-class-path /opt/jars/postgresql-42.7.4.jar
+        --jars /opt/jars/postgresql-42.7.4.jar
+        --conf spark.sql.shuffle.partitions=16
+        pyspark-shell
+
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./data:/home/jovyan/work/data
+      - ./scripts/jars:/opt/jars:ro
+    command: start-notebook.sh --NotebookApp.token=''
+    restart: unless-stopped
+
+  obt-builder:
+    build: ./obt_builder
+    container_name: pset4_obt_builder
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    entrypoint:
+      - python
+      - build_obt.py
+    command: []
+    environment:
       PG_HOST: ${PG_HOST}
       PG_PORT: ${PG_PORT}
       PG_DB: ${PG_DB}
@@ -34,12 +68,17 @@ services:
       PG_PASSWORD: ${PG_PASSWORD}
       PG_SCHEMA_RAW: ${PG_SCHEMA_RAW}
       PG_SCHEMA_ANALYTICS: ${PG_SCHEMA_ANALYTICS}
-      DATA_ROOT: ${DATA_ROOT}
+      OBT_MODE: ${OBT_MODE:-by-partition}
+      OBT_YEAR_START: ${OBT_YEAR_START:-2015}
+      OBT_YEAR_END: ${OBT_YEAR_END:-2025}
+      OBT_MONTHS: "${OBT_MONTHS:-1,2,3,4,5,6,7,8,9,10,11,12}"
+      OBT_SERVICES: "${OBT_SERVICES:-yellow,green}"
+      OBT_RUN_ID: ${OBT_RUN_ID:-}
+      OBT_OVERWRITE: ${OBT_OVERWRITE:-false}
     volumes:
-      - ./notebooks:/home/jovyan/work/notebooks
-      - ./data:/home/jovyan/work/data
-      - ./scripts:/home/jovyan/work/scripts
-      - ./obt_builder:/home/jovyan/work/obt_builder
+      - ./obt_builder:/app
+      - ./scripts/jars:/opt/jars:ro
+    restart: "no"
 
 volumes:
-  pgdata:
+  pset4_pgdata:
