@@ -1,6 +1,6 @@
-# PSet 4 — Pipeline NYC Taxi y obt-builder
+# PSet 4 —
 
-Este repositorio contiene todo lo necesario para cumplir la rúbrica de DM202501 PSet‑4: Postgres, un contenedor Jupyter+Spark para la ingesta RAW y el servicio `obt-builder` que arma `analytics.obt_trips`. Además incluye el notebook de modelado donde comparo implementaciones propias contra scikit‑learn.
+Paulo Cantos.
 
 ## Estructura
 
